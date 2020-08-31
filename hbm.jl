@@ -1,34 +1,33 @@
-using PyPlot
+using LinearAlgebra
+using Statistics
+function mctransition(β,ξ,σ) #prende uno stato del sistema in ingresso e tira fuori un nuovo stato
+    N, P = size(ξ)
+    length(σ) == N || error("wrong dimension for σ")
 
-function mctransition(β,ξ,σ,z) #prende uno stato del sistema in ingresso e tira fuori un nuovo stato
-    σn=copy(σ)
-    zn=copy(z)
-    (P,N)=lenght(zn)
-    ξn=copy(z)
-
-    fact=empty(N)
-    for i = 1:N
-        fact[i]=sum(ξn[mu][i]*zn[mu] for mu=1:P)
-    prob_si=empty(N)
-    for i = 1:N
-        prob_si[i]= exp(β*σn[i]*fact[i])/(exp(β*fact[i]) + exp(-β*fact[i]))
-    prob_s = prod(prob_si) #P(σn|zn,ξn,β) 
-    avg=empty(P)
-    for mu=1:P
-        avg[mu]= sum(ξn[mu][i]*σn[i] for i =1:N) 
-    prob_z = (β/(2*π))^(P/2)*exp(-β/2*sum((zn[mu] - avg[mu])^2) for mu =1:P) #P(zn|σn,ξn,β)
-    #aggiungere gibbs update per σ e z, compiti: calcolare P(σ|z,ξ,β) e P(z|σ,ξ,β)
-    
-    Ham = 1/2*sum(zn^2[mu]for mu=1:P) - sum(σn[i]*fact[i] for i=1:N) #H(σ, z, ξ) 
-    (σn,zn)
+    z = ((ξ')*σ)./sqrt(N) .+ randn(P)./sqrt(β) # calcoliamo le z usando la P(z|σ,ξ,β).
+    fact = ξ*z # si può fare più semplicemente cosi
+    prob_s = @. 1 / (1 + exp(-2*β*fact/sqrt(N))) # calcolo le probabilità che gli spin risultino +1 usando la P(σ_i|z,ξ,β).
+    σn = sign.(prob_s .- rand(N)) # campiono i nuovi spin con le probabilità prob_s
+    zn = ((ξ')*σn)./sqrt(N) .+ randn(P)./sqrt(β) # calcolo gli z appartenenti alla nuova configurazione sfruttando la P(z|σn,ξ,β).
+    (σn, zn)
 end
 
-function mcmc_chain(β,ξ,σ,z,N) #prende uno stato in ingresso e tira fuori una catena di stati
-    chain=fill((σ,z),N)
-    chain[1] = mctransition(β,ξ,σ,z)
+function mcmc_chain(β,ξ,σ,N) #prende uno stato in ingresso e tira fuori una catena di stati
+    chain=fill(mctransition(β,ξ,σ),N)
     for i = 2:N
-        chain[i] = mctransition(β,ξ,chain[i-1]...)
+        chain[i] = mctransition(β,ξ,chain[i-1][1])
     end
-    chain
+    (β=β,chain=chain)
 end
 
+function chain_estimators(ξ,state;skip=0)
+    β, chain=state
+    N, P = size(ξ)
+    mapped=map(chain) do (σ,z)
+        mag=((sign.(ξ)')*σ)./length(σ) # calcola magnetizzazione sign. serve per evitare problemi se xi non corrisponde a +/- 1
+        mag=@.(mag*sign(σ[1]*ξ[1,:])) # rompo l'invarianza di gauge della magnetizzazione per poter mediare osservazioni indipendenti
+        (M=mag, dlogZdξ= (β/sqrt(N))*σ*(z'), nM=sum(abs,mag))
+    end
+    K=keys(mapped[1])
+    Dict([(k => mean(getindex.(mapped,k)[(skip+1):end])) for k in K])
+end
