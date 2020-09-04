@@ -1,6 +1,7 @@
 using LinearAlgebra
 using Statistics
-function mctransition(β,ξ,σ) #prende uno stato del sistema in ingresso e tira fuori un nuovo stato
+using Random
+function mctransition(β,ξ,σ;rng=Random.GLOBAL_RNG) #prende uno stato del sistema in ingresso e tira fuori un nuovo stato
     N, P = size(ξ)
     length(σ) == N || error("wrong dimension for σ")
 
@@ -12,10 +13,10 @@ function mctransition(β,ξ,σ) #prende uno stato del sistema in ingresso e tira
     (σn, zn)
 end
 
-function mcmc_chain(β,ξ,σ,N) #prende uno stato in ingresso e tira fuori una catena di stati
-    chain=fill(mctransition(β,ξ,σ),N)
+function mcmc_chain(β,ξ,σ,N;rng=Random.GLOBAL_RNG) #prende uno stato in ingresso e tira fuori una catena di stati
+    chain=fill(mctransition(β,ξ,σ;rng),N)
     for i = 2:N
-        chain[i] = mctransition(β,ξ,chain[i-1][1])
+        chain[i] = mctransition(β,ξ,chain[i-1][1];rng)
     end
     (β=β,chain=chain)
 end
