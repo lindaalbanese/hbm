@@ -32,3 +32,30 @@ function chain_estimators(ξ,state;skip=0)
     K=keys(mapped[1])
     Dict([(k => mean(getindex.(mapped,k)[(skip+1):end])) for k in K])
 end
+
+function exp_data(β,ξ,σ) #calcolare l'aspettazione rispetto distrib dei dati 
+    N,P=size(ξ)
+    fact=(ξ')*σ
+    data=copy(ξ)
+    for μ in 1:P, i in 1:N
+        data[i, μ]=β/N*fact[μ]*σ[i]
+    end
+    data
+end
+
+function exp_model(β,ξ,σ) #calcolo aspettazione rispetto distrib data dal modello
+    N,P=size(ξ)
+    ch=mcmc_chain(β, ξ, σ, 100)
+    model=chain_estimators(ξ, ch, skip=10)[:dlogZdξ]
+    model
+end
+
+function CDstep(ϵ, β, ξ, σ)#passo di CD 
+    N,P=size(ξ)
+    data=exp_data(β, ξ, σ)  #media prob dati
+    model=exp_model(β, ξ, σ) #media prob modello
+    for  μ in 1:P, i in 1:N
+        ξ[ i, μ] += ϵ*data[i, μ]- model[i, μ] #regola di aggiornamento
+    end
+    ξ
+end
