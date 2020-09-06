@@ -55,7 +55,7 @@ function CDstep(ϵ, β, ξ, σ)#passo di CD
     data=exp_data(β, ξ, σ)  #media prob dati
     model=exp_model(β, ξ, σ) #media prob modello
     for  μ in 1:P, i in 1:N
-        ξ[ i, μ] += ϵ*data[i, μ]- model[i, μ] #regola di aggiornamento
+        ξ[ i, μ] += ϵ*(data[i, μ]- model[i, μ]) #regola di aggiornamento
     end
     ξ
 end
