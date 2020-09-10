@@ -31,24 +31,30 @@ function test(ϵ,reps,N,P, β) #ϵ learning rate, reps quali ripetizioni calcola
     end
     maxrep=maximum(reps)
     M=[(it=r,m_v=copy(ξ[1,:])) for r in reps] #per ogni valore di reps, associo magnetizz risp P pattern
+    ξv=copy(ξ)
     iM=1
     if 0 ∈ reps
         M[iM]= (it=0, m_v=magnet(ξ,β,σc))
         iM+=1
     end
     for rep in 1:maxrep
-        CDstep(ϵ,β,ξ,σc) #aggiorno ξ
+        ξv=CDstep(ϵ,β,ξ,σc) #aggiorno ξ
+        ξv=(ξv.-mean(ξv))./std(ξv)
         if rep ∈ reps #se è tra le ripetizioni fissate mantengo in memoria la magnetizzazione
-            M[iM]= (it=rep, m_v=magnet(ξ,β,σc))
+            M[iM]= (it=rep, m_v=magnet(ξv,β,σc))
             iM+=1
         end
     end
+    #print(mean(ξv))
+    #print("\n")
+    #print(std(ξv))
+    #print("\n")
     M
 end
 
 
 function magn_mean(ϵ,r,N,P, β) #calcolo media delle magnetizzazione trovate nel test
-    runs=100
+    runs=20
     V=@showprogress [test(ϵ,r,N,P, β) for i in 1:runs]
     (reps=r,
     m_v=mean(getfield.(v,:m_v) for v in V)) #getfield da v prende solo i valori contrassegnati m_v
@@ -56,7 +62,7 @@ end
 
 #test:
 ϵ=0.01
-β=1
+β=10
 r=[0; trunc.(Int,floor.(1.15.^(1:50))|>unique)]
 N=100
 P=3

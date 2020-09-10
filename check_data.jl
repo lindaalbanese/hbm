@@ -38,7 +38,7 @@ function magnet(ξ, β, σ)
     (σ, z)=mctransition(β,ξ,σ)
     mag=((sign.(ξ)')*σ)./length(σ) # calcola magnetizzazione sign. serve per evitare problemi se xi non corrisponde a +/- 1
     mag=@.(mag*sign(σ[1]*ξ[1,:])) # rompo l'invarianza di gauge della magnetizzazione per poter mediare osservazioni indipendenti
-    end for i in 1:30)
+    end for i in 1:50)
 end
 
 function test(ϵ,reps, β, data, ξ) #ϵ learning rate, reps quali ripetizioni calcolare magnetizz
@@ -51,9 +51,10 @@ function test(ϵ,reps, β, data, ξ) #ϵ learning rate, reps quali ripetizioni c
         iM+=1
     end
     for rep in 1:maxrep
-        CDstep(ϵ,β,ξ,σc) #aggiorno ξ
+        ξv=CDstep(ϵ,β,ξ,σc) #aggiorno ξ
+        ξv=(ξv.-mean(ξv))./std(ξv) #aggiorno ξ
         if rep ∈ reps #se è tra le ripetizioni fissate mantengo in memoria la magnetizzazione
-            M[iM]= (it=rep, m_v=magnet(ξ,β,σc))
+            M[iM]= (it=rep, m_v=magnet(ξv,β,σc))
             iM+=1
         end
     end
@@ -63,14 +64,14 @@ end
 
 #test:
 ϵ=0.01 #learnig rate
-β=1/0.01 #1/temp
+β= 1/0.01#1/temp
 r=[0; trunc.(Int,floor.(1.15.^(1:50))|>unique)]
 N=100
 P=3
 #creazione dataset
 ξq=rand((-1.0,1.0),N,P) #P patterns
 p=0.2
-tot_ex=2
+tot_ex=3
 data_rand=dataset(ξq, p, tot_ex)
 
 
@@ -80,14 +81,37 @@ data_rand=dataset(ξq, p, tot_ex)
 m_vv=[]
 #CD su ogni esempio
 for ex in 1:tot_ex, μ in 1:P
-    append!(m_vv,magn_mean(ϵ,r,β, data_rand[ex,μ,:], ξ)[:m_v])
+    append!(m_vv, [magn_mean(ϵ,r,β, data_rand[ex,μ,:], ξ)[:m_v][size(r)[1]]])
 end
+print(m_vv)
 
 #grafico 
 #pygui(true)
-#plot(r,m_vv[1+44*3:44*4])
+#plot(r,m_vv[1+44*0:44*1])
 
-
-
-
+data_rand2=reshape(data_rand,(P*tot_ex, N))
+function statistics2(thresh, data_rand2, m_vv)
+    good, wrong, spur=[],[],[]
+    good_ex, wrong_ex, spur_ex= [],[],[]
+    for tot in 0:P*tot_ex-1
+        example=data_rand2[tot+1,:]
+        leng1=length(good)
+        leng2=length(wrong)
+        for ν in 1:P
+            if (m_vv[tot+1][ν] - (10^(-4)) >= thresh) && (ν == mod(tot,P)+1)
+                append!(good,1)
+                append!(good_ex, [example])
+            elseif (m_vv[tot+1][ν] - (10^(-4)) >= thresh) && length(good)==leng1
+                append!(wrong,1)
+                append!(wrong_ex, [example]) 
+            end
+        end
+        if length(good)==leng1 && length(wrong) == leng2
+                append!(spur,1)
+                append!(spur_ex, [example])
+        end
+    end
+    length(good), length(wrong), length(spur)#, good_ex, wrong_ex, spur_ex 
+end
+good_num, wrong_num, spur_num =statistics2(0.98,data_rand2, m_vv)
 
