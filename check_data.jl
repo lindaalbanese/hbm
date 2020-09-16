@@ -10,7 +10,7 @@ using Statistics
 using ProgressMeter
 
 
-function dataset(ξ, q, tot_ex)
+function dataset(ξ, q, tot_ex) #creazione del dataset 
     N,P=size(ξ)
     data=zeros(tot_ex, P, N)
     for ex in 1: tot_ex, μ in 1:P
@@ -24,13 +24,25 @@ function dataset(ξ, q, tot_ex)
     data
 end 
 
-function magn_mean(ϵ,r, β, data, ξ) #calcolo media delle magnetizzazione trovate nel test
-    runs=100
-    V=@showprogress [test(ϵ,r, β, data, ξ) for i in 1:runs]
-    (reps=r,
-    m_v=mean(getfield.(v,:m_v) for v in V)) #getfield da v prende solo i valori contrassegnati m_v
+function overlap_weigths(ξ, σ) #calcolo dell'overlap tra i pesi
+    N,P=size(ξ)
+    over=zeros((P,P))
+    for μ in 1:P
+        p1=norm(ξ[:,μ],2)
+        p2=norm(σ[:,μ],2)
+        for ν in 1:P
+            over[μ,ν]= 1/(p1*p2)*sum(ξ[i,μ]*σ[i,ν] for i in 1:N)
+        end
+    end
+    over
 end
 
+function magn_mean(ϵ,r, β, data, ξ) #calcolo media delle magnetizzazione trovate nel test
+    runs=50
+    V=@showprogress [test(ϵ,r, β, data, ξ) for i in 1:runs]
+    (reps=r,
+    m_v=mean(getfield.(v,:m_v) for v in V),o_v=[[getindex(V, i)[j][:o_v] for j in 1: length(r)] for i in 1:runs], ξ_n=[getfield(V[i][length(r)], :ξ_n) for i in 1:runs]) #getfield da v prende solo i valori contrassegnati m_v
+end
 
 function magnet(ξ, β, σ)
     N,P =size(ξ)
@@ -44,52 +56,85 @@ end
 function test(ϵ,reps, β, data, ξ) #ϵ learning rate, reps quali ripetizioni calcolare magnetizz
     σc=data
     maxrep=maximum(reps)
-    M=[(it=r,m_v=copy(ξ[1,:])) for r in reps] #per ogni valore di reps, associo magnetizz risp P pattern
+    M=[(it=r,m_v=copy(ξ[1,:]), o_v= zeros(P,P), ξ_n=copy(ξ)) for r in reps] #per ogni valore di reps, associo magnetizz risp P pattern
+    ξv=copy(ξ)
     iM=1
     if 0 ∈ reps
-        M[iM]= (it=0, m_v=magnet(ξ,β,σc))
+        M[iM]= (it=0, m_v=magnet(ξ,β,σc), o_v=overlap_weigths(ξ, ξv), ξ_n=ξv)
         iM+=1
     end
     for rep in 1:maxrep
         ξv=CDstep(ϵ,β,ξ,σc) #aggiorno ξ
-        ξv=(ξv.-mean(ξv))./std(ξv) #aggiorno ξ
         if rep ∈ reps #se è tra le ripetizioni fissate mantengo in memoria la magnetizzazione
-            M[iM]= (it=rep, m_v=magnet(ξv,β,σc))
+            M[iM]= (it=rep, m_v=magnet((ξv.-mean(ξv))./std(ξv),β,σc),  o_v=overlap_weigths(ξ, ξv), ξ_n=ξv)
             iM+=1
         end
     end
     M
 end
 
+function magn_mean_data(ϵ, r, β, data, ξn )
+    N,P=size(ξn)
+    tot_ex=size(data)[1]
+    m_vv=[]
+    o_vv=[]
+    #CD su ogni esempio
+    for ex in 1:tot_ex
+        for μ in 1:P
+            V=magn_mean(ϵ,r,β, data[ex,μ,:], ξn)
+            append!(m_vv, [V[:m_v][size(r)[1]]])
+            append!(o_vv, [V[:o_v]])
+            ξn=last(V[:ξ_n])
+        end
+    end
+    (m_vv=m_vv, o_vv=o_vv)
+end
 
 #test:
 ϵ=0.01 #learnig rate
-β= 1/0.01#1/temp
+β= 1/0.01 #1/temp
 r=[0; trunc.(Int,floor.(1.15.^(1:50))|>unique)]
 N=100
 P=3
 #creazione dataset
 ξq=rand((-1.0,1.0),N,P) #P patterns
 p=0.2
-tot_ex=3
+tot_ex=2
 data_rand=dataset(ξq, p, tot_ex)
 
-
-ξ=mean(data_rand[ex,:,:] for ex in 1:tot_ex)
+ξ=mean(data_rand[ex,:,:] for ex in 1:tot_ex) #media degli esempi
 ξ=ξ'
-#m_vv=zeros(tot_ex, P, size(r)[1])
-m_vv=[]
-#CD su ogni esempio
-for ex in 1:tot_ex, μ in 1:P
-    append!(m_vv, [magn_mean(ϵ,r,β, data_rand[ex,μ,:], ξ)[:m_v][size(r)[1]]])
+
+V=magn_mean_data(ϵ, r, β, data_rand, ξ)
+
+m_vv=V[:m_vv]
+o_vv=V[:o_vv]
+over_final=[o_vv[j][i][length(r)] for j in 1: P*tot_ex, i in 1:length(o_vv[1])] #check
+ovv=mean(over_final, dims=2)
+#print(ovv)
+pygui(true)
+matshow(mean(ovv))
+plt.title("overlap-mean β=" * string(β)*",α="*string(P/N))
+colorbar()
+
+diag_over=[]
+for ex in 1:P*tot_ex, i in 1: length(o_vv[1])
+    append!(diag_over, [diag(last(o_vv[ex][i]))])
 end
-print(m_vv)
+
+diag_graph=[]
+figure()
+for μ in 1: P
+    append!(diag_graph, [[getindex(diag_over, i)[μ] for i in 1: length(diag_over)]])
+    plot(diag_graph[μ])
+end
+plt.title("β="*string(β)*", α="*string(P/N))#*", mean="*string(mean(mean(diag_graph)))*", std="*string(std(std(diag_graph))))
 
 #grafico 
 #pygui(true)
 #plot(r,m_vv[1+44*0:44*1])
 
-data_rand2=reshape(data_rand,(P*tot_ex, N))
+data_rand2=reshape(data_rand, (P*tot_ex, N))
 function statistics2(thresh, data_rand2, m_vv)
     good, wrong, spur=[],[],[]
     good_ex, wrong_ex, spur_ex= [],[],[]
@@ -115,3 +160,25 @@ function statistics2(thresh, data_rand2, m_vv)
 end
 good_num, wrong_num, spur_num =statistics2(0.98,data_rand2, m_vv)
 
+
+function statistics1(thresh, data_rand2, m_vv)
+    good, wrong, spur=[],[],[]
+    good_ex, wrong_ex, spur_ex= [],[],[]
+    for tot in 0:P*tot_ex-1
+        example=data_rand2[tot+1,:]
+            if findmax(m_vv[tot+1])[1] > thresh
+                if (findmax(m_vv[tot+1])[2] == mod(tot,P)+1)
+                 append!(good,1)
+                    append!(good_ex, [example])
+                else
+                    append!(wrong,1)
+                    append!(wrong_ex, [example]) 
+                end
+            else 
+                append!(spur,1)
+                append!(spur_ex, [example])
+            end
+    end
+    length(good), length(wrong), length(spur)#, good_ex, wrong_ex, spur_ex 
+end
+good_num, wrong_num, spur_num =statistics1(0.5,data_rand2, m_vv)

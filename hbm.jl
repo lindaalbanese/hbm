@@ -1,6 +1,7 @@
 using LinearAlgebra
 using Statistics
 using Random
+
 function mctransition(β,ξ,σ;rng=Random.GLOBAL_RNG) #prende uno stato del sistema in ingresso e tira fuori un nuovo stato
     N, P = size(ξ)
     length(σ) == N || error("wrong dimension for σ")
