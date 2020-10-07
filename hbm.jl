@@ -4,6 +4,9 @@ using Random
 
 function mctransition(β,ξ,σ;rng=Random.GLOBAL_RNG) #prende uno stato del sistema in ingresso e tira fuori un nuovo stato
     N, P = size(ξ)
+
+    #ξ=(ξ.-mean(ξ))./std(ξ) #normalizzazione pesi
+
     length(σ) == N || error("wrong dimension for σ")
 
     z = ((ξ')*σ)./sqrt(N) .+ randn(P)./sqrt(β) # calcoliamo le z usando la P(z|σ,ξ,β).
@@ -23,6 +26,7 @@ function mcmc_chain(β,ξ,σ,N;rng=Random.GLOBAL_RNG) #prende uno stato in ingre
 end
 
 function chain_estimators(ξ,state;skip=0)
+    ξ=(ξ.-mean(ξ))./std(ξ)
     β, chain=state
     N, P = size(ξ)
     mapped=map(chain) do (σ,z)
@@ -35,12 +39,16 @@ function chain_estimators(ξ,state;skip=0)
 end
 
 function exp_data(β,ξ,σ) #calcolare l'aspettazione rispetto distrib dei dati 
+    #ξ=(ξ.-mean(ξ))./std(ξ)
     N,P=size(ξ)
     fact=(ξ')*σ
     data=copy(ξ)
     for μ in 1:P, i in 1:N
         data[i, μ]=β/N*fact[μ]*σ[i]
     end
+    #fact=reshape(fact, (P,1))
+    #σ=reshape(σ, (N,1))
+    #data=β/N*fact*σ'
     data
 end
 
@@ -55,8 +63,9 @@ function CDstep(ϵ, β, ξ, σ)#passo di CD
     N,P=size(ξ)
     data=exp_data(β, ξ, σ)  #media prob dati
     model=exp_model(β, ξ, σ) #media prob modello
-    for  μ in 1:P, i in 1:N
-        ξ[ i, μ] += ϵ*(data[i, μ]- model[i, μ]) #regola di aggiornamento
-    end
-    ξ
+    ξ .+= ϵ.*(data.-model)
+    #for  μ in 1:P, i in 1:N
+    #    ξ[ i, μ] += ϵ*(data[i, μ]- model[i, μ]) #regola di aggiornamento
+    #end
+    ξ 
 end

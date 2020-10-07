@@ -91,31 +91,6 @@ function magn_mean_data(ϵ, r, β, data, ξn )
     (m_vv=m_vv, ξ_n=ξn)
 end
 
-#test:
-ϵ=0.01 #learnig rate
-β= 1/1.1 #1/temp
-r=[0; trunc.(Int,floor.(1.15.^(1:50))|>unique)]
-N=100
-P=4
-#creazione dataset
-ξq=rand((-1.0,1.0),N,P) #P patterns
-
-#ξq=rand(Binomial(1,0.5),(N,P))
-#ξq=ifelse.(ξq .== 1, 1, -1)
-
-p=0.2
-tot_ex1=500
-data_rand=dataset(ξq, p, tot_ex1)
-
-ξ=reshape(mean(data_rand, dims=1), (P,N))#mean(data_rand[ex,:,:] for ex in 1:tot_ex1) #media degli esempi
-ξ=ξ'
-
-tot_ex=1
-V=magn_mean_data(ϵ, r, β, data_rand[1:tot_ex,:,:], ξ)
-
-m_vv=V[:m_vv]
-
-data_rand2=reshape(data_rand, (P*tot_ex1, N))
 function statistics2(thresh, data_rand2, m_vv)
     good, wrong, spur=[],[],[]
     good_ex, wrong_ex, spur_ex= [],[],[]
@@ -139,10 +114,8 @@ function statistics2(thresh, data_rand2, m_vv)
     end
     length(good), length(wrong), length(spur)#, good_ex, wrong_ex, spur_ex 
 end
-#good_num, wrong_num, spur_num =statistics2(0.85,data_rand2[1:P*tot_ex, :], m_vv)
 
-
-function statistics1(thresh, data_rand2, m_vv)
+function statistics1(thresh, data_rand2, m_vv, P, tot_ex)
     good, wrong, spur=[],[],[]
     good_ex, wrong_ex, spur_ex= [],[],[]
     for tot in 0:P*tot_ex-1
@@ -162,16 +135,60 @@ function statistics1(thresh, data_rand2, m_vv)
     end
     length(good), length(wrong), length(spur)#, good_ex, wrong_ex, spur_ex 
 end
-good_num, wrong_num, spur_num =statistics1(0.85,data_rand2[1:P*tot_ex, :], m_vv)
+
+#test:
+ϵ=0.01 #learnig rate
+#β= 1/2 #1/temp
+r=[0; trunc.(Int,floor.(1.15.^(1:50))|>unique)]
+#N=100
+#P=4
+p=0.2
+
+#creazione dataset
+#P patterns
+
+#ξq=rand(Binomial(1,0.5),(N,P))
+#ξq=ifelse.(ξq .== 1, 1, -1)
+
+good=[] 
+difference=[]
+
+values=[(0.01, 1/0.02), (0.02, 1/0.02), (0.03, 1/0.02), (0.04, 1/0.02), (0.05, 1/0.02), (0.06, 1/0.02), (0.07, 1/0.02), (0.08, 1/0.02), (0.09, 1/0.02), (0.10, 1/0.02), (0.11, 1/0.02) ]
+P=4
+for (α, β) in values
+    N=Int(floor(P/α))
+    ξq=rand((-1.0,1.0),N,P) 
+    tot_ex1=500
+    data_rand=dataset(ξq, p, tot_ex1)
+    ξ=reshape(mean(data_rand, dims=1), (P,N))#mean(data_rand[ex,:,:] for ex in 1:tot_ex1) #media degli esempi
+    ξ=ξ'
+    tot_ex=2
+    V=magn_mean_data(ϵ, r, β, data_rand[1:tot_ex,:,:], ξ)
+    m_vv=V[:m_vv]
+    data_rand2=reshape(data_rand, (P*tot_ex1, N))
+    good_num, wrong_num, spur_num =statistics1(0.85,data_rand2[1:P*tot_ex, :], m_vv, P, tot_ex)
+    append!(good, good_num)
+    diff=mean(diag(overlap_weigths(ξ, V[:ξ_n]))) - abs(1/(P*P-P)*sum(overlap_weigths(ξ, V[:ξ_n])-Diagonal(diag(overlap_weigths(ξ, V[:ξ_n])))))
+    append!(difference, diff)
+end
 
 pygui(true)
-matshow(overlap_weigths(ξ, V[:ξ_n]))
-plt.title("Last overlap matrix weigths: β="*string(β)*", α="*string(P/N)*"\ngood= "*string(good_num)*"wrong="*string(wrong_num))
-colorbar()
+figure()
+plot([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11],difference)
 
-magnn=[]
-for ex in 1:tot_ex
-    for μ in 1:P
-        append!(magnn, [magnet(V[:ξ_n], β, data_rand[ex, μ, :])])
-    end
-end
+xlabel("α")
+ylabel("difference")
+title("difference mean(diagonal) and mean(other elements)")
+
+pygui(true)
+figure()
+plot([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11], good)
+xlabel("α")
+ylabel("number good")
+title("number of example well recognized")
+#difference=mean(diag(overlap_weigths(ξ, V[:ξ_n]))) - (1/(P*P-P)*sum(overlap_weigths(ξ, V[:ξ_n])-Diagonal(diag(overlap_weigths(ξ, V[:ξ_n])))))
+
+#pygui(true)
+#matshow(overlap_weigths(ξ, V[:ξ_n]))
+#plt.title("Last overlap matrix weigths: β="*string(β)*", α="*string(P/N)*"\ngood= "*string(good_num)*"wrong="*string(wrong_num))
+#colorbar()
