@@ -150,12 +150,12 @@ p=0.2
 #ξq=rand(Binomial(1,0.5),(N,P))
 #ξq=ifelse.(ξq .== 1, 1, -1)
 
-good=[] 
-difference=[]
+#good=[] 
+#difference=[]
 
-values=[(0.01, 1/0.02), (0.02, 1/0.02), (0.03, 1/0.02), (0.04, 1/0.02), (0.05, 1/0.02), (0.06, 1/0.02), (0.07, 1/0.02), (0.08, 1/0.02), (0.09, 1/0.02), (0.10, 1/0.02), (0.11, 1/0.02) ]
+values=[(0.01, 1/0.02), (0.02, 1/0.02)]#, (0.03, 1/0.02), (0.04, 1/0.02), (0.05, 1/0.02), (0.06, 1/0.02), (0.07, 1/0.02), (0.08, 1/0.02), (0.09, 1/0.02), (0.10, 1/0.02), (0.11, 1/0.02) ]
 P=4
-for (α, β) in values
+#= for (α, β) in values
     N=Int(floor(P/α))
     ξq=rand((-1.0,1.0),N,P) 
     tot_ex1=500
@@ -170,7 +170,28 @@ for (α, β) in values
     append!(good, good_num)
     diff=mean(diag(overlap_weigths(ξ, V[:ξ_n]))) - abs(1/(P*P-P)*sum(overlap_weigths(ξ, V[:ξ_n])-Diagonal(diag(overlap_weigths(ξ, V[:ξ_n])))))
     append!(difference, diff)
+end =#
+
+
+difference=[]
+for (α, β) in values
+    N=Int(floor(P/α))
+    ξq=rand((-1.0,1.0),N,P) #P patterns
+    p=0.10
+    data_rand = cat([sign.(rand(size(ξq)...) .- p) .* ξq for i=1:10]...,dims=3)
+    ξ=mean(data_rand,dims=3)[:,:,1]    
+    ξt,mat= CDtest(data_rand,ϵ, β)
+
+    push!(difference,mean(diag(overlap_weigths(ξ, ξt)))-abs(1/(P*P-P)*sum(overlap_weigths(ξ, ξt)-Diagonal(diag(overlap_weigths(ξ, ξt))))))
+
+    #=     data_rand2=reshape(data_rand, (P*tot_ex1, N))
+    good_num, wrong_num, spur_num =statistics1(0.85,data_rand2[1:P*tot_ex, :], m_vv, P, tot_ex)
+    append!(good, good_num)
+    diff=mean(diag(overlap_weigths(ξ, V[:ξ_n]))) - abs(1/(P*P-P)*sum(overlap_weigths(ξ, V[:ξ_n])-Diagonal(diag(overlap_weigths(ξ, V[:ξ_n])))))
+    append!(difference, diff)
+ =#
 end
+
 
 pygui(true)
 figure()

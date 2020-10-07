@@ -86,15 +86,29 @@ function CDtest()
 end
 
 
-
 CDtest()
  =#
+
+ function overlap_weigths(ξ, σ) #calcolo dell'overlap tra i pesi
+    N,P=size(ξ)
+    over=zeros((P,P))
+    for μ in 1:P
+        for ν in 1:P
+            p1=norm(ξ[:,μ],2)
+            p2=norm(σ[:,ν],2)
+            over[μ,ν]= 1/(p1*p2)*sum(ξ[i,μ]*σ[i,ν] for i in 1:N)
+        end
+    end
+    over
+end
+
+
 using PyPlot
 
 pygui(true)
 
 ϵ=0.01 #learnig rate
-β= 1/1.1 #1/temp
+β= 1/2 #1/temp
 r=[0; trunc.(Int,floor.(1.15.^(1:50))|>unique)]
 N=100
 P=4
@@ -105,18 +119,19 @@ P=4
 #ξq=ifelse.(ξq .== 1, 1, -1)
 
 p=0.10
-data_rand = cat([sign.(rand(size(ξq)...) .- p) .* ξq for i=1:3]...,dims=3)
+data_rand = cat([sign.(rand(size(ξq)...) .- p) .* ξq for i=1:10]...,dims=3)
 
 # ξ_iμ -> x_iμ / √(1+x_iμ^2)
+
+ξ=mean(data_rand,dims=3)[:,:,1]
 
 function CDtest(data,ϵ,β)
     ϵ′=ϵ/β
     N, P, Nesempi = size(data)
     ξ=mean(data,dims=3)[:,:,1]
-    normξ=norm(ξ)/sqrt(N*P)
-    ξ.+=randn(size(ξ)...)*normξ*0.5
-
-    refnorm=norm(data[:,:,1])
+    #normξ=norm(ξ)/sqrt(N*P)
+    #ξ.+=randn(size(ξ)...)*normξ*0.5
+    #refnorm=norm(data[:,:,1])
     matrices=Array{Float64,3}[]
     @showprogress for j = 1:500
         magμ=zeros(P,P,Nesempi)
@@ -134,7 +149,49 @@ function CDtest(data,ϵ,β)
     ξ,matrices
 end
 
-ξt,mat= CDtest(data_rand,0.1, 10.05)
+ξt,mat= CDtest(data_rand,ϵ, β)
 
-
+pygui(true)
+figure()
 imshow(mat[end][:,:,1]); colorbar()
+title("magnetization")
+
+
+pygui(true)
+figure()
+imshow(overlap_weigths(ξ, ξt)); colorbar()
+title("overlap-learning")
+
+#= pygui(true)
+imshow(ξt'*ξ./N); colorbar() =#
+
+function statistics(mat, thresh, data)
+    good=0
+    wrong=0
+    spur=0
+    #= good_data=Array{Int,1}[]
+    wrong_data=Array{Int,1}[]
+    spur_data=Array{Int,1}[] =#
+    for i in 1:size(mat)[3]
+        #matt=mat[:,:,i]
+        for j in 1:P
+            if findmax(mat[j,:,i])[1] > thresh
+                if findmax(mat[j,:,i])[2] == j 
+                    good+=1
+                    #push!(good_data, data[:,j,i])
+                else
+                    wrong+=1
+                    #push!(wrong_data, data[:,j,i])
+                end
+            else
+                spur+=1
+                #push!(spur_data, data[:,j,i])
+            end
+        end
+    end
+    good, wrong, spur
+end
+
+
+matt=mat[end]
+good1, wrong1, spur1=statistics(matt, 0.65, data_rand)
