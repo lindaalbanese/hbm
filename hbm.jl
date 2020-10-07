@@ -31,7 +31,7 @@ function chain_estimators(ξ,state;skip=0)
     N, P = size(ξ)
     mapped=map(chain) do (σ,z)
         mag=((sign.(ξ)')*σ)./length(σ) # calcola magnetizzazione sign. serve per evitare problemi se xi non corrisponde a +/- 1
-        mag=@.(mag*sign(σ[1]*ξ[1,:])) # rompo l'invarianza di gauge della magnetizzazione per poter mediare osservazioni indipendenti
+        mag=abs.(mag) # rompo l'invarianza di gauge della magnetizzazione per poter mediare osservazioni indipendenti
         (M=mag, dlogZdξ= (β/sqrt(N))*σ*(z'), nM=sum(abs,mag))
     end
     K=keys(mapped[1])
@@ -55,17 +55,86 @@ end
 function exp_model(β,ξ,σ) #calcolo aspettazione rispetto distrib data dal modello
     N,P=size(ξ)
     ch=mcmc_chain(β, ξ, σ, 100)
-    model=chain_estimators(ξ, ch, skip=10)[:dlogZdξ]
-    model
+    model=chain_estimators(ξ, ch, skip=10)
+    model[:dlogZdξ],model[:M]
 end
 
 function CDstep(ϵ, β, ξ, σ)#passo di CD 
     N,P=size(ξ)
     data=exp_data(β, ξ, σ)  #media prob dati
-    model=exp_model(β, ξ, σ) #media prob modello
+    model,mag =exp_model(β, ξ, σ) #media prob modello
     ξ .+= ϵ.*(data.-model)
     #for  μ in 1:P, i in 1:N
     #    ξ[ i, μ] += ϵ*(data[i, μ]- model[i, μ]) #regola di aggiornamento
     #end
-    ξ 
+    mag
 end
+
+
+using ProgressMeter
+#= 
+function CDtest()
+    ξ=sign.(randn(100,3)).*0.001
+
+    σD=[sign.(randn(100)) for i in 1:2]
+    @showprogress for j = 1:1000
+        for i in eachindex(σD)
+            CDstep(0.1,10.0,ξ,σD[i])
+        end
+    end
+    σD,ξ
+end
+
+
+
+CDtest()
+ =#
+using PyPlot
+
+pygui(true)
+
+ϵ=0.01 #learnig rate
+β= 1/1.1 #1/temp
+r=[0; trunc.(Int,floor.(1.15.^(1:50))|>unique)]
+N=100
+P=4
+#creazione dataset
+ξq=rand((-1.0,1.0),N,P) #P patterns
+
+#ξq=rand(Binomial(1,0.5),(N,P))
+#ξq=ifelse.(ξq .== 1, 1, -1)
+
+p=0.10
+data_rand = cat([sign.(rand(size(ξq)...) .- p) .* ξq for i=1:3]...,dims=3)
+
+# ξ_iμ -> x_iμ / √(1+x_iμ^2)
+
+function CDtest(data,ϵ,β)
+    ϵ′=ϵ/β
+    N, P, Nesempi = size(data)
+    ξ=mean(data,dims=3)[:,:,1]
+    normξ=norm(ξ)/sqrt(N*P)
+    ξ.+=randn(size(ξ)...)*normξ*0.5
+
+    refnorm=norm(data[:,:,1])
+    matrices=Array{Float64,3}[]
+    @showprogress for j = 1:500
+        magμ=zeros(P,P,Nesempi)
+        @inbounds for i in 1:Nesempi, μ = 1:P
+            mag = CDstep(ϵ′,β,ξ,data[:,μ,i])
+            for μ′ = 1:P
+                magμ[μ,μ′,i]=mag[μ′]
+            end
+        end
+        push!(matrices,magμ)
+        μξ=mean(ξ)
+        σξ=std(ξ)
+        @. ξ = (ξ-μξ)/σξ
+    end
+    ξ,matrices
+end
+
+ξt,mat= CDtest(data_rand,0.1, 10.05)
+
+
+imshow(mat[end][:,:,1]); colorbar()
