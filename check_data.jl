@@ -60,7 +60,7 @@ function test(ϵ,reps, β, data, ξ) #ϵ learning rate, reps quali ripetizioni c
     ξv=copy(ξ)
     iM=1
     if 0 ∈ reps
-        M[iM]= (it=0, m_v=magnet(ξ,β,σc), ξ_n=ξv)
+        M[iM]= (it=0, m_v=magnet(ξv,β,σc), ξ_n=ξv)
         iM+=1
     end
     for rep in 1:maxrep
@@ -78,7 +78,7 @@ function magn_mean_data(ϵ, r, β, data, ξn )
     N,P=size(ξn)
     tot_ex=size(data)[1]
     m_vv=[]
-    o_vv=[]
+    #o_vv=[]
     #CD su ogni esempio
     for ex in 1:tot_ex
         for μ in 1:P
@@ -93,7 +93,7 @@ end
 
 #test:
 ϵ=0.01 #learnig rate
-β= 1/1.1 #1/temp
+β= 1/0.5 #1/temp
 r=[0; trunc.(Int,floor.(1.15.^(1:50))|>unique)]
 N=100
 P=4
@@ -110,7 +110,8 @@ data_rand=dataset(ξq, p, tot_ex1)
 ξ=reshape(mean(data_rand, dims=1), (P,N))#mean(data_rand[ex,:,:] for ex in 1:tot_ex1) #media degli esempi
 ξ=ξ'
 
-tot_ex=1
+
+tot_ex=10
 V=magn_mean_data(ϵ, r, β, data_rand[1:tot_ex,:,:], ξ)
 
 m_vv=V[:m_vv]

@@ -155,14 +155,14 @@ p=0.2
 
 values=[(0.01, 1/0.02), (0.02, 1/0.02)]#, (0.03, 1/0.02), (0.04, 1/0.02), (0.05, 1/0.02), (0.06, 1/0.02), (0.07, 1/0.02), (0.08, 1/0.02), (0.09, 1/0.02), (0.10, 1/0.02), (0.11, 1/0.02) ]
 P=4
-#= for (α, β) in values
+for (α, β) in values
     N=Int(floor(P/α))
     ξq=rand((-1.0,1.0),N,P) 
     tot_ex1=500
     data_rand=dataset(ξq, p, tot_ex1)
     ξ=reshape(mean(data_rand, dims=1), (P,N))#mean(data_rand[ex,:,:] for ex in 1:tot_ex1) #media degli esempi
     ξ=ξ'
-    tot_ex=2
+    tot_ex=5
     V=magn_mean_data(ϵ, r, β, data_rand[1:tot_ex,:,:], ξ)
     m_vv=V[:m_vv]
     data_rand2=reshape(data_rand, (P*tot_ex1, N))
@@ -170,9 +170,9 @@ P=4
     append!(good, good_num)
     diff=mean(diag(overlap_weigths(ξ, V[:ξ_n]))) - abs(1/(P*P-P)*sum(overlap_weigths(ξ, V[:ξ_n])-Diagonal(diag(overlap_weigths(ξ, V[:ξ_n])))))
     append!(difference, diff)
-end =#
+end 
 
-
+#= 
 difference=[]
 for (α, β) in values
     N=Int(floor(P/α))
@@ -190,7 +190,7 @@ for (α, β) in values
     diff=mean(diag(overlap_weigths(ξ, V[:ξ_n]))) - abs(1/(P*P-P)*sum(overlap_weigths(ξ, V[:ξ_n])-Diagonal(diag(overlap_weigths(ξ, V[:ξ_n])))))
     append!(difference, diff)
  =#
-end
+end =#
 
 
 pygui(true)

@@ -26,7 +26,7 @@ function mcmc_chain(β,ξ,σ,N;rng=Random.GLOBAL_RNG) #prende uno stato in ingre
 end
 
 function chain_estimators(ξ,state;skip=0)
-    ξ=(ξ.-mean(ξ))./std(ξ)
+    #ξ=(ξ.-mean(ξ))./std(ξ)
     β, chain=state
     N, P = size(ξ)
     mapped=map(chain) do (σ,z)
@@ -67,7 +67,8 @@ function CDstep(ϵ, β, ξ, σ)#passo di CD
     #for  μ in 1:P, i in 1:N
     #    ξ[ i, μ] += ϵ*(data[i, μ]- model[i, μ]) #regola di aggiornamento
     #end
-    mag
+    mag #SE USI IN HBM
+    #ξ #SE USI IN CHECK-DATA
 end
 
 
@@ -107,26 +108,9 @@ using PyPlot
 
 pygui(true)
 
-ϵ=0.01 #learnig rate
-β= 1/2 #1/temp
-r=[0; trunc.(Int,floor.(1.15.^(1:50))|>unique)]
-N=100
-P=4
-#creazione dataset
-ξq=rand((-1.0,1.0),N,P) #P patterns
-
-#ξq=rand(Binomial(1,0.5),(N,P))
-#ξq=ifelse.(ξq .== 1, 1, -1)
-
-p=0.10
-data_rand = cat([sign.(rand(size(ξq)...) .- p) .* ξq for i=1:10]...,dims=3)
-
-# ξ_iμ -> x_iμ / √(1+x_iμ^2)
-
-ξ=mean(data_rand,dims=3)[:,:,1]
 
 function CDtest(data,ϵ,β)
-    ϵ′=ϵ/β
+    ϵ′=ϵ#/β
     N, P, Nesempi = size(data)
     ξ=mean(data,dims=3)[:,:,1]
     #normξ=norm(ξ)/sqrt(N*P)
@@ -148,22 +132,6 @@ function CDtest(data,ϵ,β)
     end
     ξ,matrices
 end
-
-ξt,mat= CDtest(data_rand,ϵ, β)
-
-pygui(true)
-figure()
-imshow(mat[end][:,:,1]); colorbar()
-title("magnetization")
-
-
-pygui(true)
-figure()
-imshow(overlap_weigths(ξ, ξt)); colorbar()
-title("overlap-learning")
-
-#= pygui(true)
-imshow(ξt'*ξ./N); colorbar() =#
 
 function statistics(mat, thresh, data)
     good=0
@@ -192,6 +160,111 @@ function statistics(mat, thresh, data)
     good, wrong, spur
 end
 
+ϵ=0.01 #learnig rate
+β= 1/0.2 #1/temp
+#r=[0; trunc.(Int,floor.(1.15.^(1:50))|>unique)]
+N=100
+P=4
+#creazione dataset
+ξq=rand((-1.0,1.0),N,P) #P patterns
+
+#ξq=rand(Binomial(1,0.5),(N,P))
+#ξq=ifelse.(ξq .== 1, 1, -1)
+
+p=0.10
+data_rand = cat([sign.(rand(size(ξq)...) .- p) .* ξq for i=1:50]...,dims=3)
+
+# ξ_iμ -> x_iμ / √(1+x_iμ^2)
+
+ξ=mean(data_rand,dims=3)[:,:,1]
+
+ξt,mat= CDtest(data_rand,ϵ, β)
+
+pygui(true)
+figure()
+imshow(mat[end][:,:,1]); colorbar()
+title("magnetization")
+
+
+pygui(true)
+figure()
+imshow(overlap_weigths(ξ, ξt)); colorbar()
+title("overlap-learning")
+
+#= pygui(true)
+imshow(ξt'*ξ./N); colorbar() =#
 
 matt=mat[end]
 good1, wrong1, spur1=statistics(matt, 0.65, data_rand)
+
+############################
+#LOOP
+#= ϵ=0.01 #learnig rate
+values=[(0.01, 1/0.2), (0.02, 1/0.2), (0.03, 1/0.2), (0.04, 1/0.2), (0.05, 1/0.2), (0.06, 1/0.2), (0.07, 1/0.2), (0.08, 1/0.2), (0.09, 1/0.2), (0.10, 1/0.2), (0.11, 1/0.2) ]
+P=4
+good_data=[]
+difference=[]
+for (α, β) in values 
+    N=Int(floor(P/α))
+
+    ξq=rand((-1.0,1.0),N,P) #P patterns
+    p=0.10
+    data_rand = cat([sign.(rand(size(ξq)...) .- p) .* ξq for i=1:10]...,dims=3)
+    ξ=mean(data_rand,dims=3)[:,:,1]
+
+    ξt,mat= CDtest(data_rand,ϵ, β)
+    matt=mat[end]
+    good1, wrong1, spur1=statistics(matt, 0.65, data_rand)
+    push!(good_data, good1)
+    push!(difference,mean(diag(overlap_weigths(ξ, ξt)))-abs(1/(P*P-P)*sum(overlap_weigths(ξ, ξt)-Diagonal(diag(overlap_weigths(ξ, ξt))))))
+end
+
+pygui(true)
+figure()
+plot([0.01,0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11], good_data, "o-")
+title("good")
+
+pygui(true)
+figure()
+plot([0.01,0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11], difference, "o-")
+title("difference")
+ =#
+
+############################
+#LOOP CON BETA  
+#= ϵ=0.01 #learnig rate
+values=[(0.04, 1/0.2), (0.04, 1/0.4), (0.04, 1/0.8), (0.04, 1/1.2), (0.04, 1/1.5), (0.04, 1/1.8), (0.04, 1/2), (0.04, 1/5), (0.04, 1/10)]
+P=4
+N=100
+ξq=rand((-1.0,1.0),N,P) #P patterns
+p=0.10
+data_rand = cat([sign.(rand(size(ξq)...) .- p) .* ξq for i=1:10]...,dims=3)
+ξ=mean(data_rand,dims=3)[:,:,1]
+
+good_data=[]
+difference=[]
+for (α, β) in values 
+    ξt,mat= CDtest(data_rand,ϵ, β)
+    matt=mat[end]
+    good1, wrong1, spur1=statistics(matt, 0.65, data_rand)
+    push!(good_data, good1)
+    #push!(difference,sqrt(mean((diag(overlap_weigths(ξ, ξt))).^2))-sqrt(1/(P*P-P)*sum((overlap_weigths(ξ, ξt)-Diagonal(diag(overlap_weigths(ξ, ξt)).^2)))))
+    #push!(difference,mean(diag(overlap_weigths(ξ, ξt)))-abs(1/(P*P-P)*sum(overlap_weigths(ξ, ξt)-Diagonal(diag(overlap_weigths(ξ, ξt))))))
+    push!(difference,mean(diag(overlap_weigths(ξ, ξt)).^2)- (mean((overlap_weigths(ξ, ξt)-Diagonal(diag(overlap_weigths(ξ, ξt)))).^2))*(P*P)/(P*P-P))
+end
+
+#= beta=[]
+for i in 1: size(values)[1]
+    append!(beta, values[i][2])
+end =#
+
+pygui(true)
+figure()
+plot([0.2,0.4, 0.8, 1.2, 1.5, 1.8, 2, 5, 10], good_data, "o-")
+title("good")
+
+pygui(true)
+figure()
+plot([0.2,0.4, 0.8, 1.2, 1.5, 1.8, 2, 5, 10], difference, "o-")
+title("difference") =#
+
